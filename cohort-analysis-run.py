@@ -328,7 +328,9 @@ def create_cohort_data(data, cohort_settings, date_range, segments):
                         'cohort': cohort,
                         'period': period,
                         'rate': rate,
-                        'segment': segment
+                        'segment': segment,
+                        'cohort_size': cohort_size,
+                        'retained_users': retained_users
                     })
 
         return pd.DataFrame(retention_data)
@@ -361,7 +363,6 @@ def visualization():
             st.warning("No data available for visualization. Please check your inputs.")
             return
 
-        # Create tabs for different visualizations
         tab1, tab2, tab3 = st.tabs(["📈 Line Chart", "🔥 Heatmap", "📊 Statistics"])
 
         with tab1:
@@ -370,12 +371,14 @@ def visualization():
             # Aggregate data for line chart
             aggregated_data = retention_data.groupby(['segment', 'period'])['rate'].mean().reset_index()
 
+            if aggregated_data.empty:
+                st.warning("Insufficient data to display the line chart.")
+                return
 
-            # Define a custom color sequence
             colors = px.colors.qualitative.Set2
 
             fig = px.line(
-                retention_data,
+                aggregated_data,
                 x='period',
                 y='rate',
                 color='segment',
@@ -388,7 +391,6 @@ def visualization():
                 title=f"{rate_type} by Segment"
             )
 
-            # Improve layout
             fig.update_layout(
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -401,7 +403,7 @@ def visualization():
                     gridcolor='rgba(128,128,128,0.2)',
                     title_font=dict(size=14),
                     tickfont=dict(size=12),
-                    tickformat='.0%'
+                    tickformat='.2%'
                 ),
                 legend=dict(
                     yanchor="top",
@@ -416,14 +418,50 @@ def visualization():
             st.plotly_chart(fig, use_container_width=True)
 
         with tab2:
-            # Create heatmap for each segment
             for segment in st.session_state.segments:
                 segment_data = retention_data[retention_data['segment'] == segment]
+
+                if len(segment_data) == 0:
+                    st.warning(f"No sufficient data to display heatmap for segment: {segment}")
+                    continue
+
+                # Create pivot tables
                 pivot_data = segment_data.pivot(
                     index='cohort',
                     columns='period',
                     values='rate'
                 )
+
+                retained_users = segment_data.pivot(
+                    index='cohort',
+                    columns='period',
+                    values='retained_users'
+                )
+
+                cohort_sizes = segment_data.pivot(
+                    index='cohort',
+                    columns='period',
+                    values='cohort_size'
+                )
+
+                # Create hover text matrix
+                hover_text = []
+                for idx in range(len(pivot_data.index)):
+                    hover_row = []
+                    for col in range(len(pivot_data.columns)):
+                        rate = pivot_data.iloc[idx, col]
+                        retained = retained_users.iloc[idx, col]
+                        cohort_size = cohort_sizes.iloc[idx, 0]  # Use first column for cohort size
+
+                        if pd.notna(rate):
+                            hover_row.append(
+                                f"Rate: {rate:.2%}<br>" +
+                                f"Retained: {int(retained)}<br>" +
+                                f"Cohort Size: {int(cohort_size)}"
+                            )
+                        else:
+                            hover_row.append("")
+                    hover_text.append(hover_row)
 
                 fig_heatmap = px.imshow(
                     pivot_data,
@@ -434,14 +472,18 @@ def visualization():
                     title=f"{rate_type} Heatmap - {segment} Segment"
                 )
 
-                # Update heatmap layout
+                fig_heatmap.update_traces(
+                    hovertemplate="%{text}<extra></extra>",
+                    text=hover_text
+                )
+
                 fig_heatmap.update_layout(
                     xaxis_title="Period",
                     yaxis_title="Cohort",
                     xaxis=dict(tickangle=0),
                     coloraxis_colorbar=dict(
                         title=rate_type,
-                        tickformat='.0%'
+                        tickformat='.2%'
                     )
                 )
 
@@ -451,11 +493,16 @@ def visualization():
             st.markdown("### 📊 Analysis Statistics")
 
             stats = retention_data.groupby('segment').agg({
-                'rate': ['mean', 'min', 'max']
-            }).round(3)
+                'rate': ['mean', 'min', 'max'],
+                'cohort_size': 'sum'
+            }).round(4)
 
-            stats.columns = ['Average Rate', 'Minimum Rate', 'Maximum Rate']
+            stats.columns = ['Average Rate', 'Minimum Rate', 'Maximum Rate', 'Total Users']
             stats = stats.reset_index()
+
+            # Format percentages in the dataframe
+            for col in ['Average Rate', 'Minimum Rate', 'Maximum Rate']:
+                stats[col] = stats[col].apply(lambda x: f"{x:.2%}")
 
             st.dataframe(stats, use_container_width=True)
 
