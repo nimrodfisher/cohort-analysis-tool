@@ -367,6 +367,10 @@ def visualization():
         with tab1:
             rate_type = st.session_state.cohort_settings['retention_type']
 
+            # Aggregate data for line chart
+            aggregated_data = retention_data.groupby(['segment', 'period'])['rate'].mean().reset_index()
+
+
             # Define a custom color sequence
             colors = px.colors.qualitative.Set2
 
