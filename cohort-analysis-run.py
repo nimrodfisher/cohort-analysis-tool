@@ -169,94 +169,6 @@ def segmentation():
         st.info("ℹ️ No segment column found in the data. Using all data for analysis.")
         st.session_state.segments = ['All']
 
-
-# def create_cohort_data(data, cohort_settings, date_range, segments):
-#     try:
-#         # Filter data based on date range and cohort basis
-#         filtered_data = data[
-#             (data['date'] >= pd.Timestamp(date_range['start'])) &
-#             (data['date'] <= pd.Timestamp(date_range['end'])) &
-#             (data['event_type'] == cohort_settings['cohort_basis'])
-#             ]
-#
-#         # Create cohorts based on the cohort type
-#         cohort_data = filtered_data.groupby('customer_id')['date'].min().reset_index()
-#
-#         if cohort_settings['cohort_type'] == 'Daily':
-#             cohort_data['cohort'] = cohort_data['date'].dt.strftime('%Y-%m-%d')
-#         elif cohort_settings['cohort_type'] == 'Weekly':
-#             cohort_data['cohort'] = cohort_data['date'].dt.to_period('W').astype(str)
-#         else:  # Monthly
-#             cohort_data['cohort'] = cohort_data['date'].dt.to_period('M').astype(str)
-#
-#         retention_events = data[data['event_type'] == cohort_settings['retention_event']]
-#
-#         retention_data = []
-#
-#         for segment in segments:
-#             if segment != 'All':
-#                 segment_cohorts = cohort_data[cohort_data['customer_id'].isin(
-#                     data[data['segment'] == segment]['customer_id']
-#                 )]
-#             else:
-#                 segment_cohorts = cohort_data
-#
-#             # Calculate average retention/churn for each period across all cohorts
-#             for period in range(13):  # 0 to 12 periods
-#                 cohort_rates = []
-#
-#                 for cohort in sorted(segment_cohorts['cohort'].unique()):
-#                     cohort_users = segment_cohorts[segment_cohorts['cohort'] == cohort]['customer_id']
-#                     cohort_size = len(cohort_users)
-#
-#                     if cohort_size == 0:
-#                         continue
-#
-#                     # Parse cohort date based on cohort type
-#                     if cohort_settings['cohort_type'] == 'Daily':
-#                         cohort_start = pd.to_datetime(cohort)
-#                     else:
-#                         cohort_start = pd.Period(cohort).to_timestamp()
-#
-#                     # Calculate period start and end
-#                     if cohort_settings['cohort_type'] == 'Daily':
-#                         period_start = cohort_start + pd.Timedelta(days=period)
-#                         period_end = period_start + pd.Timedelta(days=1)
-#                     elif cohort_settings['cohort_type'] == 'Weekly':
-#                         period_start = cohort_start + pd.Timedelta(weeks=period)
-#                         period_end = period_start + pd.Timedelta(weeks=1)
-#                     else:  # Monthly
-#                         period_start = cohort_start + pd.DateOffset(months=period)
-#                         period_end = period_start + pd.DateOffset(months=1)
-#
-#                     # Count retained users
-#                     retained_users = retention_events[
-#                         (retention_events['customer_id'].isin(cohort_users)) &
-#                         (retention_events['date'] >= period_start) &
-#                         (retention_events['date'] < period_end)
-#                         ]['customer_id'].nunique()
-#
-#                     rate = retained_users / cohort_size
-#                     if cohort_settings['retention_type'] == 'Churn Rate':
-#                         rate = 1 - rate
-#
-#                     cohort_rates.append(rate)
-#
-#                 # Calculate average rate for this period
-#                 if cohort_rates:
-#                     avg_rate = sum(cohort_rates) / len(cohort_rates)
-#                     retention_data.append({
-#                         'period': period,
-#                         'rate': avg_rate,
-#                         'segment': segment
-#                     })
-#
-#         return pd.DataFrame(retention_data)
-#
-#     except Exception as e:
-#         st.error(f"❌ An error occurred while processing the data: {str(e)}")
-#         return pd.DataFrame()
-
 def create_cohort_data(data, cohort_settings, date_range, segments):
     try:
         # Filter data based on date range and cohort basis
@@ -359,26 +271,21 @@ def visualization():
                 st.session_state.segments
             )
 
-        if retention_data.empty:
-            st.warning("No data available for visualization. Please check your inputs.")
-            return
-
-        tab1, tab2, tab3 = st.tabs(["📈 Line Chart", "🔥 Heatmap", "📊 Statistics"])
-
         with tab1:
             rate_type = st.session_state.cohort_settings['retention_type']
-
+            
             # Aggregate data for line chart
             aggregated_data = retention_data.groupby(['segment', 'period'])['rate'].mean().reset_index()
-
+        
             if aggregated_data.empty:
                 st.warning("Insufficient data to display the line chart.")
                 return
-
+        
             colors = px.colors.qualitative.Set2
-
+            
+            # Here's where we need to change retention_data to aggregated_data
             fig = px.line(
-                aggregated_data,
+                aggregated_data,  # Changed from retention_data to aggregated_data
                 x='period',
                 y='rate',
                 color='segment',
