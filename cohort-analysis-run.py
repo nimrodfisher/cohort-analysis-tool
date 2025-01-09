@@ -566,6 +566,13 @@ def main():
     elif step == "5. Visualization":
         visualization()
 
-
+    # Add divider and CTA
+    st.divider()
+    st.markdown("### 📚 Want to learn more about building data stacks and data analytics methods?")
+    st.markdown(
+        """
+        [Read more on my eBook and additional helpful resources here](https://tdh-analytics.com/resources/) 🚀
+        """
+    )
 if __name__ == "__main__":
     main()
