@@ -302,25 +302,32 @@ def create_cohort_data(data, cohort_settings, date_range, segments):
                     cohort_start = pd.Period(cohort).to_timestamp()
 
                 for period in range(13):  # 0 to 12 periods
-                    # Calculate period start and end
-                    if cohort_settings['cohort_type'] == 'Daily':
-                        period_start = cohort_start + pd.Timedelta(days=period)
-                        period_end = period_start + pd.Timedelta(days=1)
-                    elif cohort_settings['cohort_type'] == 'Weekly':
-                        period_start = cohort_start + pd.Timedelta(weeks=period)
-                        period_end = period_start + pd.Timedelta(weeks=1)
-                    else:  # Monthly
-                        period_start = cohort_start + pd.DateOffset(months=period)
-                        period_end = period_start + pd.DateOffset(months=1)
+                    # For period 0, retention is always 100%
+                    if period == 0:
+                        rate = 1.0
+                        retained_users = cohort_size
+                    else:
+                        # Calculate period start and end
+                        if cohort_settings['cohort_type'] == 'Daily':
+                            period_start = cohort_start + pd.Timedelta(days=period)
+                            period_end = period_start + pd.Timedelta(days=1)
+                        elif cohort_settings['cohort_type'] == 'Weekly':
+                            period_start = cohort_start + pd.Timedelta(weeks=period)
+                            period_end = period_start + pd.Timedelta(weeks=1)
+                        else:  # Monthly
+                            period_start = cohort_start + pd.DateOffset(months=period)
+                            period_end = period_start + pd.DateOffset(months=1)
 
-                    # Count retained users
-                    retained_users = retention_events[
-                        (retention_events['customer_id'].isin(cohort_users)) &
-                        (retention_events['date'] >= period_start) &
-                        (retention_events['date'] < period_end)
-                    ]['customer_id'].nunique()
+                        # Count retained users - look for any activity within the period
+                        retained_users = retention_events[
+                            (retention_events['customer_id'].isin(cohort_users)) &
+                            (retention_events['date'] >= period_start) &
+                            (retention_events['date'] < period_end)
+                        ]['customer_id'].nunique()
 
-                    rate = retained_users / cohort_size
+                        rate = retained_users / cohort_size
+
+                    # Apply churn calculation if needed
                     if cohort_settings['retention_type'] == 'Churn Rate':
                         rate = 1 - rate
 
